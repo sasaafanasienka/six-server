@@ -7,7 +7,7 @@ const getRandomInteger = require('./utils/getRandomInteger');
 class Game {
 	constructor() {
 		this.server = new WebSocket.Server({
-			port: 8081,
+			port: 8080,
 		});
 		this.deck = undefined;
 		this.queue = [];
@@ -22,33 +22,33 @@ class Game {
 	}
 
 	init() {
-		this.server.on('connection', (socket, params) => {
-			const id = params.url.split('?')[1].split('&').map((el) => el.split('=')).find((el) => el[0] === 'id')[1];
-			console.log(id);
+		this.server.on('connection', (socket, query) => {
+				console.log(query);
 			if (this.data.players.length < this.config.maxPLayers) {
-				this.connectClient(socket, id);
+				socket.addEventListener('message', ({ data }) => { this.connectClient(socket, data); }, { once: true });
 			} else {
 				this.discardClient(socket);
 			}
 		});
 	}
 
-	connectClient(socket, id) {
-		// const { id, type } = JSON.parse(message);
-		// if (type === 'id') {
-		const newId = id ?? getRandomId();
-		if (!id) {
-			socket.send(JSON.stringify({ type: 'new-id', id: newId }));
+	connectClient(socket, message) {
+			console.log('connte')
+		const { id, type } = JSON.parse(message);
+		if (type === 'id') {
+			const newId = id ?? getRandomId();
+			if (!id) {
+				socket.send(JSON.stringify({ type: 'new-id', id: newId }));
+			}
+			if (this.data.players.every((player) => player.getId() !== newId)) {
+				const player = new Player({ id: newId, socket });
+				this.data.players.push(player);
+			}
+			console.log('added');
+			socket.on('message', (receivedMsg) => { this.messageHandler(receivedMsg, newId); });
+			socket.on('close', () => { this.closeHandler(newId); });
+			this.refreshToAll();
 		}
-		if (this.data.players.every((player) => player.getId() !== newId)) {
-			const player = new Player({ id: newId, socket });
-			this.data.players.push(player);
-		}
-		// console.log('added');
-		socket.on('message', (receivedMsg) => { this.messageHandler(receivedMsg, newId); });
-		socket.on('close', () => { this.closeHandler(newId); });
-		this.refreshToAll();
-		// }
 	}
 
 	getGameData = (player) => {
@@ -73,7 +73,6 @@ class Game {
 	}
 
 	closeHandler(clientId) {
-		console.log(clientId, 'out');
 		this.data.players.splice(clientId, 1);
 		this.data.players.forEach((client) => {
 			client.wins = 0;
@@ -98,6 +97,7 @@ class Game {
 			this.actionHandler(messageData, clientId);
 			break;
 		case 'move':
+			console.log('movehandler');
 			this.moveHandler(messageData, clientId);
 			break;
 		case 'take':
@@ -118,24 +118,20 @@ class Game {
 		}
 	}
 
-	moveHandler(messageData, clientId) {
-		const currentPlayer = this.data.players.find((player) => player.id === clientId);
-		if (currentPlayer) {
-			currentPlayer.move(messageData.data);
-			this.data.onTop = messageData.data;
-			if (messageData.data.value !== 14) {
-				this.setActivePlayer('next');
-			} else {
-				this.setActivePlayer('skip');
-			}
-			this.data.reverse = messageData.data.value !== 8 ? this.data.reverse : !this.data.reverse;
-			this.refreshToAll();
+	moveHandler(messageData) {
+		this.data.onTop = messageData.card;
+		if (messageData.card.value !== 14) {
+			this.setActivePlayer('next');
+		} else {
+			this.setActivePlayer('skip');
 		}
+		this.data.reverse = messageData.card.value !== 8 ? this.data.reverse : !this.data.reverse;
+		this.refreshToAll();
 	}
 
 	takeHandler(clientId) {
-		this.data.players[clientId].cards.push(...this.deal(1));
-		this.refreshToAll();
+		this.players[clientId].cards.push(...this.deal(1));
+		this.sendState();
 	}
 
 	startGame = () => {
@@ -195,6 +191,8 @@ class Game {
 		});
 	};
 }
+
+console.log('server.js');
 
 const game = new Game();
 game.init();

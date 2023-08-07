@@ -3,12 +3,13 @@ const deck = require('../constants/constants');
 class Deck {
 	constructor() {
 		this.startDeck = deck;
-		this.deck = undefined;
+		this.cards = undefined;
 		this.garbage = [];
+		this.init();
 	}
 
 	init() {
-		this.deck = this.shuffle(this.startDeck);
+		this.cards = this.shuffle(this.startDeck);
 	}
 
 	// eslint-disable-next-line class-methods-use-this, no-unused-vars
@@ -17,13 +18,13 @@ class Deck {
 	deal(number) {
 		const res = [];
 		for (let i = 0; i < number; i += 1) {
-			res.push(this.deck.pop());
+			res.push(this.cards.pop());
 		}
 		return res;
 	}
 
 	restore() {
-		this.deck = this.shuffle(this.garbage);
+		this.cards = this.shuffle(this.garbage);
 		this.garbage = [];
 	}
 }
